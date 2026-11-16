@@ -1,212 +1,483 @@
-# OmniRS — Полная карта проекта
+# OmniRS — полная карта проекта (обновлённая архитектура модулей)
 
-Единый production-сервер в одном бинарнике: HTTP/1.1+HTTP/2(TLS)+HTTP/3(QUIC), обратный прокси
-(балансировка/failover/circuit-breaker/sticky), WebSocket/gRPC/FastCGI-прокси, ACME (Let's Encrypt),
-mTLS, кэш (moka), rate-limit, метрики Prometheus, веб-админка, hot-reload, полноценный DNS-сервер
-(authoritative+recursive+DNSSEC+DoT/DoQ/DoH/DoH3+RPZ+TSIG+GeoDNS+Weighted+RRL+dnstap+Audit+IXFR),
-встроенная БД (SQL-подобный язык + протоколы MySQL/PostgreSQL на :1000), WireGuard VPN, IKEv2,
-Hysteria2 (miraj), forward-туннели (TCP/UDP/SOCKS5/TProxy), встроенный IPS (fail2ban).
+**Основано на фактическом содержимом архива `OmniRS_modules_reworked.zip`.** Документ описывает файлы и связи текущего проекта. Он не является гарантией успешной компиляции: Rust-сборка в рабочем окружении не выполнялась.
 
-После рефакторинга — Cargo workspace из 11 библиотечных крейтов + 1 бинарный.
+## 1. Что изменилось в архитектуре
 
----
+В этой версии сторонние Rust-модули из ZIP предназначены для встраивания в **основной бинарник `OmniRS`**, а не для загрузки `.so`.
 
-## 1. Структура workspace
+- `server/src/modules.rs` — единый менеджер системных и устанавливаемых модулей.
+- `server/build.rs` обнаруживает исходники в `modules/installed/` и генерирует Rust-реестр в `OUT_DIR/generated_modules.rs`.
+- `server/src/main.rs` включает сгенерированный реестр через `include!`, запускает `start()` установленных модулей и публикует их административные ресурсы.
+- `server/src/api/mod.rs` передаёт API-контекст в `generated_modules::dispatch()` после существующих ранних dispatch-ветвей и до обычных API-обработчиков.
+- `server/static/admin/modules.js` предоставляет список, загрузку/обновление ZIP, открытие интерфейса и удаление модулей.
+- `server/src/native_modules.rs`, `core/src/module.rs` и зависимость `libloading` отсутствуют в обновлённой структуре. `.so`-режим в этой версии не реализован.
 
-```
-Omni/
-├── Cargo.toml              # [workspace] + [workspace.dependencies] (единые версии)
-├── Cargo.lock
-├── ritual.sh               # установка/обновление (systemd unit, swap, seed БД, alias 'ritual')
-├── .cargo/config.toml       # линкер + incremental (по умолчанию cc; оригинал — clang+mold)
-│
-├── core/                   # 155 строк  — общие примитивы (X25519/WireGuard crypto)
-│   └── src/{lib.rs, crypto.rs}
-├── logger/                 #  73 строки  — RollingLogger (access/slow log, ротация)
-├── cors/                   #  36 строк   — чистые CORS-хелперы (origin_allowed, preflight)
-├── security/               # 412 строк   — IPS/fail2ban: SSH-брутфорс, HTTP-атаки, port-scan, SYN-flood → iptables
-├── dns/                    # 1360 строк  — DNS-сервер (протокол, зоны, DoT/DoQ/DoH, RPZ, TSIG, GeoDNS)
-├── tunnel/                 # 1846 строк  — forward-туннели (TCP/UDP/Stdio/SOCKS5/TProxy, JWT, restrictions)
-├── db/                     # 1153 строк  — DbManager (rusqlite+bb8), схемы OmniDB/OmniVPN, SQL-dialect, MySQL/PG-протокол
-├── ikev2/                  #  849 строк  — IKEv2/IPsec (Ryke: crypto, SA, ESP)
-├── ssl/                    #  834 строк  — SslManager (rustls, ACME HTTP-01/TLS-ALPN, self-signed, hot-reload)
-├── miraj/                  #  715 строк  — Hysteria2 поверх QUIC (brutal congestion, auth, multiplexed)
-├── vpn/                    # 2178 строк  — WireGuard (uapi, netlink, iface, конфиги, клиентские таблицы)
-│
-└── server/                 # бинарник [[bin]] name = "OmniRS"
-    ├── Cargo.toml          # зависит от всех 11 крейтов
+**Важно:** это compile-time подключение. Установка/обновление требует пересборки всего `OmniRS` и перезапуска службы. Модуль не становится исполняемым Rust-кодом в текущем процессе без этого.
+
+## 2. Полное дерево файлов
+
+```text
+OmniRS/
+├── .cargo/
+│   └── config.toml
+├── Cargo.toml                 # workspace, версии и общие зависимости
+├── Cargo.lock                 # закреплённые версии зависимостей
+├── MAP.md                     # этот документ
+├── MODULES.md                 # контракт и формат source-модулей
+├── ritual.sh                  # исходный Bash-установщик; не изменён
+├── public/                    # каталог публичных файлов (в архиве пустой)
+├── modules/
+│   ├── installed/             # установленные source-модули; в архиве .keep
+│   ├── staging/               # временные каталоги обновления/распаковки
+│   └── state/                 # статусы и логи фоновой сборки
+├── examples/
+│   ├── example_module.zip     # пример ZIP-модуля
+│   └── module-template/
+│       ├── module.toml
+│       ├── src/installer.rs
+│       └── admin/index.js
+├── core/
+│   ├── Cargo.toml
+│   └── src/
+│       ├── lib.rs
+│       └── crypto.rs
+├── cors/
+│   ├── Cargo.toml
+│   └── src/lib.rs
+├── security/
+│   ├── Cargo.toml
+│   └── src/lib.rs
+├── dns/
+│   ├── Cargo.toml
+│   └── src/lib.rs
+├── db/
+│   ├── Cargo.toml
+│   ├── OmniDB                 # runtime SQLite-файл, если включён в поставку
+│   ├── OmniDB-shm             # SQLite WAL sidecar
+│   ├── OmniDB-wal             # SQLite WAL sidecar
+│   ├── OmniVPN                # runtime SQLite-файл, если включён в поставку
+│   ├── OmniVPN-shm
+│   ├── OmniVPN-wal
+│   └── src/
+│       ├── lib.rs
+│       └── dispatch.rs
+├── ikev2/
+│   ├── Cargo.toml
+│   └── src/lib.rs
+├── ssl/
+│   ├── Cargo.toml
+│   └── src/lib.rs
+├── miraj/
+│   ├── Cargo.toml
+│   └── src/lib.rs
+├── tunnel/
+│   ├── Cargo.toml
+│   └── src/
+│       ├── lib.rs
+│       ├── executor.rs
+│       ├── protocols.rs
+│       ├── restrictions.rs
+│       ├── server.rs
+│       ├── somark.rs
+│       ├── tls_reloader.rs
+│       └── transport.rs
+├── vpn/
+│   ├── Cargo.toml
+│   └── src/
+│       ├── lib.rs
+│       ├── db.rs
+│       ├── iface.rs
+│       ├── netlink.rs
+│       └── uapi.rs
+└── server/
+    ├── Cargo.toml
+    ├── build.rs               # генерирует compile-time реестр модулей
     ├── src/
-    │   ├── main.rs         # 2074 строки — точка входа, AppState/Config, HTTP/HTTP2/HTTP3-сервер, прокси, статика, оркестрация
-    │   ├── api.rs          # 1786 строки — /api/* + /terminal/* диспетчер, сессии, нотификации
-    │   └── omni_mw.rs      # 153 строки  — axum-middleware: access_log + cors_mw (привязаны к AppState)
-    └── static/             # 23 файла — встроены через include_str!("../static/...")
+    │   ├── main.rs            # основной сервер и orchestration
+    │   ├── modules.rs         # единый менеджер модулей; ZIP/build/status/delete
+    │   ├── installer.rs       # Rust CLI-установщик
+    │   ├── omni_mw.rs         # middleware
+    │   ├── static_assets.rs   # встраиваемые HTML/JS/CSS
+    │   └── api/
+    │       ├── mod.rs         # API dispatch и ApiCtx
+    │       ├── auth.rs        # авторизация
+    │       ├── helpers.rs     # ответы и разбор параметров
+    │       ├── sess.rs        # сессии/runtime-состояние
+    │       └── handlers/
+    │           ├── mod.rs
+    │           ├── cache.rs
+    │           ├── dns_h.rs
+    │           ├── files.rs
+    │           ├── misc.rs
+    │           ├── proxy.rs
+    │           ├── settings.rs
+    │           ├── system.rs
+    │           └── ui.rs
+    └── static/
         ├── admin.html
+        ├── admin/
+        │   ├── app.js
+        │   ├── dashboard.js
+        │   ├── db.js
+        │   ├── dns.js
+        │   ├── files.js
+        │   ├── modules.js
+        │   ├── proxy.js
+        │   ├── settings.js
+        │   ├── ssl.js
+        │   ├── vpn.js
+        │   └── style.css
         ├── terminal.html
-        ├── admin/          # app.js dashboard.js db.js dns.js files.js monitoring.js proxy.js settings.js ssl.js vpn.js style.css
-        └── terminal/       # api.js app.js console.js hack.js leak.js state.js ui.js utils.js views.js style.css
+        └── terminal/
+            ├── api.js
+            ├── app.js
+            ├── console.js
+            ├── hack.js
+            ├── leak.js
+            ├── state.js
+            ├── style.css
+            ├── ui.js
+            ├── utils.js
+            └── views.js
 ```
 
-Итого: **~17.6k строк Rust**.
+Файлы `OmniDB`, `OmniVPN`, `-wal`, `-shm` — SQLite runtime-данные, а не исходный код. Их включение в архив не означает, что ими следует заменять данные рабочей установки.
 
----
+## 3. Cargo workspace и сборка
 
-## 2. Граф зависимостей (ациклический, снизу вверх)
+Корневой `Cargo.toml` объявляет workspace с resolver `2`, edition `2024`, `rust-version = 1.100` и 11 пакетами: `core`, `cors`, `security`, `dns`, `tunnel`, `db`, `ikev2`, `ssl`, `miraj`, `vpn`, `server`. Общие версии библиотек централизованы в `[workspace.dependencies]`.
 
+`server/Cargo.toml` задаёт пакет `omni-server`, бинарный target `OmniRS` и зависимости на внутренние crates и сетевые/системные библиотеки.
+
+### `server/build.rs`
+
+1. Просматривает `modules/installed/<id>/`.
+2. Проверяет допустимость ID.
+3. Читает `module.toml` и извлекает поле `entry` (по умолчанию `src/module.rs`).
+4. Убеждается, что entry находится в `src/`, не содержит `..` и указывает на существующий файл.
+5. Генерирует `OUT_DIR/generated_modules.rs` с `#[path = "..."] pub mod ...` для найденных модулей.
+6. Генерирует общий `start(state)` и `dispatch(ctx)`, вызывающие одноимённые функции каждого source-модуля.
+7. Добавляет `cargo:rerun-if-changed` для каталога модулей и файлов внутри него.
+
+Идентификаторы Rust-модулей кодируются в безопасные имена `m_<hex ID>`, поэтому дефисы в ID не становятся дефисами в идентификаторах Rust.
+
+**Граница механизма:** build.rs не превращает произвольный crate из ZIP в новый workspace member и не добавляет автоматически внешние Cargo dependencies. Встраиваемый entry должен быть совместим с типами и зависимостями основного `omni-server`.
+
+## 4. Формат устанавливаемого модуля
+
+Документ контракта: `MODULES.md`. Пример: `examples/module-template/` и `examples/example_module.zip`.
+
+```text
+my-module.zip
+├── module.toml
+├── src/
+│   ├── installer.rs
+│   └── installer/handlers.rs   # дочерние файлы, если используются mod handlers;
+└── admin/
+    ├── index.js                # необязательно
+    └── style.css               # необязательно
 ```
-                        ┌──────────────────────────────┐
-                        │  server (bin «OmniRS»)       │  main.rs + api.rs + omni_mw.rs + static/
-                        └──────────────┬───────────────┘
-        ┌──────────┬──────────┬─────────┼─────────┬──────────┬──────────┐
-        ▼          ▼          ▼         ▼         ▼          ▼          ▼
-      vpn       ssl       miraj     ikev2      db       tunnel     (dns, security,
-        │         │          │         │         │          │         logger, cors)
-        │         └────┐     │         │         │          │
-        │              ▼     ▼         ▼         │          │
-        │            dns  (dns)    (db)◄─────────┘          │
-        │              ▲     ▲                              │
-        └────────► core ◄────┴──────────────────────────────┘
-                   (X25519 crypto)
+
+Пример манифеста:
+
+```toml
+id = "my_module"
+name = "My module"
+version = "1.0.0"
+description = "Описание модуля"
+kind = "source"
+entry = "src/installer.rs"
+admin_entry = "admin/index.js"
 ```
 
-| Крейт | Зависит от | Роль в слое |
-|---|---|---|
-| core | — | низший слой, чистая крипта (std only) |
-| logger, cors, security, dns, tunnel | — | автономные, без внутренних зависимостей |
-| db | core | БД + схемы (использует core::crypto для генерации WireGuard-ключей при seed) |
-| ikev2 | db | — |
-| ssl | db, dns | dns — для `extract_sans` / `normalize_dns_name` |
-| miraj | db | — |
-| vpn | core, db | ре-экспортирует `omni_db::{db_dir, open_omni, open_vpn, client_table_name, create_client_table}` в своём `mod db` |
-| server | все 11 | оркестрация, HTTP-слой, статика |
+`id` должен совпадать с ID, указанным при загрузке ZIP. `kind` в текущем менеджере должен быть `source`. Entry должен быть существующим `.rs`-файлом внутри `src/`. `admin_entry` необязателен и должен указывать внутрь `admin/`.
 
----
+Главный Rust-файл обязан предоставить:
 
-## 3. Карта крейтов: ответственность и публичный API
+- `pub async fn start(state: crate::SharedState)` — запуск фоновых задач/служб при старте OmniRS;
+- `pub async fn dispatch(ctx: crate::api::ApiCtx) -> Option<axum::response::Response<axum::body::Body>>` — обработка API; `None` означает, что модуль не обработал endpoint.
 
-### core (`omni_core`)
-- `crypto::genkey() / genpsk() / pubkey(sk) / key_to_base64 / key_from_base64 / key_to_hex / key_from_hex / x25519 / curve25519_generate_public` — чистая реализация X25519 + base64/hex, `/dev/urandom` (без внешних crypto-крейтов).
-- Вынесен из `vpn::crypto`, чтобы разорвать цикл `db ↔ vpn`.
+`ApiCtx` содержит `state`, `method`, `endpoint`, `query`, `headers`, `body`, `client_ip`. В API pipeline `dispatch` вызывается после ранних dispatch-ветвей для tunnel, DB, VPN, сертификатов, IKEv2, Miraj и самого менеджера модулей, но до обычных встроенных admin handlers. Следовательно, совпадение endpoint с одной из ранних ветвей не передаёт управление пользовательскому source-модулю.
 
-### logger (`omni_logger`)
-- `RollingLogger::new(path, max_size_mb, max_files)` → `.write(&str)`, ротация `.1..N`.
-- Используется в `AppState.access_logger / slow_logger`.
+Административный JS должен экспортировать `mount(container)`. Он динамически загружается из `/module-assets/<id>/<admin_entry>`. Файлы интерфейса хранятся в `modules/installed/<id>/admin/` и отдаются через обработчик `serve_module_asset`, который проверяет путь и ограничивает доступ каталогом конкретного модуля.
 
-### cors (`omni_cors`)
-- `cors_origin_allowed(origin, &[String])`, `cors_preflight_response(origin)`, константы `ALLOW_METHODS / ALLOW_HEADERS`.
-- Сам middleware `cors_mw` — в `server::omni_mw` (нужен `SharedState`).
+## 5. `server/src/modules.rs` — единый менеджер модулей
 
-### security (`omni_security`)
-- `IntrusionPrevention::new(window_sec)` — бан через `iptables/ip6tables`, мониторинг `journalctl` (ssh, omnirs, kernel). Запуск: `security::start_monitors(ips, ssh_whitelist)` из main.
+Функции и ответственность:
 
-### dns (`omni_dns`)
-- `DnsServer::from_config(DnsConfig)`, `run_udp / run_tcp / run_dot_tls / start_dot_server / start_doq_server / serve_doq_stream`.
-- Типы: `DnsConfig`, `DnsError`, `Name`, `Message`, `Record`, `RData`, `Zone`, `ZoneChange`, `AuditLog`.
+- держит метаданные системных модулей в `SYSTEM_MODULES`;
+- валидирует ID и манифест source-модуля;
+- безопасно извлекает ZIP, блокирует абсолютные пути, `..`, `:` и выход за каталог назначения; ограничивает распакованный размер 256 MiB;
+- создаёт/обновляет схему и записи `OmniModules` через `omni_db::open_omni()`;
+- хранит файлы в `modules/installed/`, временные файлы в `modules/staging/`, состояние сборки в `modules/state/`;
+- запускает фоновую пересборку через `systemd-run`, а при неудаче пробует отдельный процесс `sh`;
+- пишет build log и статусные файлы;
+- предоставляет список модулей, загрузку/обновление, статус и удаление.
 
-### tunnel (`omni_tunnel`)
-- `TunnelServer::new(TunnelServerConfig, DefaultTokioExecutor)`, `serve`, `handle_tunnel_request`, `RestrictionsRules::from_path_prefix`, `DnsResolver::new_from_urls`, `SoMark`, `LocalProtocol` (Tcp/Udp/Stdio/Socks5/TProxyTcp/Reverse*).
-- Внутренние inline-модули: `protocols::dns`, `somark`, `executor`, `restrictions`, `transport`, `server`.
+### API менеджера
 
-### db (`omni_db`)
-- `init_global().await`, `global() -> Option<Arc<DbManager>>`, `DbConfig::from_env()`, `db_dir()`, `open_omni() / open_vpn()`, `Pool` (Sqlite), `run_query`.
-- Схемы: `init_system_schema`, `init_vpn_schema`, `client_table_name / create_client_table` (переехали из `vpn::db`).
-- HTTP-dispatch: `dispatch_api(db, method, endpoint, qmap, headers, body, client_ip)`, `dispatch_tunnel_api(method, endpoint, ...)`.
-
-### ikev2 (`omni_ikev2`)
-- `run(...)`, `start_server(...)`, `dispatch_api(ikev2_enabled, ikev2_listen, ikev2_psk, ikev2_local_id, ikev2_remote_id, method, endpoint, ...)`.
-
-### ssl (`omni_ssl`)
-- `SslManager::new()`, `reload_from_db().await`, `generate_self_signed_default()`, `spawn_initial_issuance`, `AcmeMode` (False/Http/Tls/All).
-- `dispatch_api(acme_ip: Option<String>, root: PathBuf, ssl: Option<Arc<SslManager>>, method, endpoint, ...)`.
-
-### miraj (`omni_miraj`)
-- `MirajConfig::from_map(&HashMap)`, `run(cfg, resolver, shutdown).await`, `is_hysteria_auth`, `handle_auth`, `handle_authorized_connection`, `BrutalFactory`, `AuthResult`.
-- `dispatch_api(method, endpoint, ...)` (state не нужен).
-
-### vpn (`omni_vpn`)
-- `VpnConfig`, `startup(&VpnConfig).await`, `start_cron()`, `metrics_extra_async()`, `serve_otl(token)`, `dispatch(method, endpoint, query, headers, body, client_ip)` (state не нужен).
-- Подмодули: `uapi`, `netlink`, `iface`, `db` (ре-экспорт omni_db + `row_to_client`, `drop_client_table`, `list_client_tables`, `get_interface`).
-
-### server (`omni-server`, bin `OmniRS`)
-- **main.rs**: `Config` (toml/json/env/DB), `AppState` (SharedState = `Arc<RwLock<Arc<AppState>>>`), HTTP/1.1+HTTP2 (axum-server rustls), HTTP/3 (h3-axum/quinn), multiplexed QUIC (miraj поверх h3), WebTransport-туннель, обратный прокси (round-robin + health + circuit-breaker + sticky), FastCGI, ACME, статика (include_str!), hot-reload, оркестрация vpn/miraj/dns/ikev2/tunnel/security.
-- **api.rs**: `dispatch(state, ...)` — `/api/*` (db, vpn, ssl, dns, ikev2, miraj, tunnel, файлы, бэкапы, мониторинг), `dispatch_terminal(...)` — `/terminal/*`, сессии (`Session`), `push_notif`.
-- **omni_mw.rs**: `access_log` (JSON access/slow log + `x-request-id`), `cors_mw` (hot-reload `cors_allowed_origins` из AppState).
-
----
-
-## 4. Статика (встроена в бинарник через `include_str!`)
-
-| Путь | Что |
+| Запрос | Назначение |
 |---|---|
-| `static/admin.html` + `static/admin/*.{js,css}` | Веб-админка: dashboard, db, dns, files, monitoring, proxy, settings, ssl, vpn |
-| `static/terminal.html` + `static/terminal/*.{js,css}` | Web-терминал: api, app, console, hack, leak, state, ui, utils, views |
+| `GET /api/modules` или `GET /api/modules/list` | Список системных и установленных модулей |
+| `POST /api/modules/upload/<id>` | ZIP в теле запроса; установка или обновление по ID |
+| `GET /api/modules/status/<id>` | Статус и журнал сборки |
+| `POST /api/modules/delete/<id>` | Удаление исходников и запуск пересборки без модуля |
+| `GET /module-assets/<id>/<path>` | Отдача статического ресурса модуля; отдельный route в `main.rs` |
 
-Пути `include_str!("../static/...")` не менялись при переносе (`server/src/main.rs` → `../static/` = `server/static/`).
+Upload API ограничивает тело 100 MiB; обычные API тела ограничены 10 MiB. ID системных модулей зарезервированы и не могут быть заменены сторонним ZIP через upload.
 
----
+### Обновление модуля с тем же ID
 
-## 5. Сборка и запуск
+Если `modules/installed/<id>` уже существует, менеджер временно переименовывает старый каталог в `modules/staging/<id>.old`, размещает новые исходники, обновляет запись БД и запускает сборку. В ответе API `updated` показывает, существовал ли каталог до загрузки. После успешной сборки скрипт удаляет backup-каталог. При ошибке сборки действующий бинарник не заменяется, но новые исходники остаются в каталоге установки для исправления.
+
+**Осторожно:** каталог исходников заменяется до завершения компиляции. При ошибке сборки старый исходный каталог автоматически не восстанавливается в текущем build script, хотя работающий бинарник остаётся прежним. Кроме того, после удаления модуля выполняется пересборка, но поведение при ошибке сборки нужно учитывать: исходники уже удалены.
+
+### Системный список
+
+`SYSTEM_MODULES` перечисляет `core`, `cors`, `security`, `dns`, `tunnel`, `db`, `ikev2`, `ssl`, `miraj`, `vpn`, `server`. Это метаданные для админки, а не динамическая загрузка crates. Эти crates по-прежнему компилируются обычным Cargo workspace.
+
+## 6. База данных `db`
+
+`db/src/lib.rs` реализует SQLite-конфигурацию, подключение, создание системной схемы и операции с данными. `db/src/dispatch.rs` содержит HTTP dispatch для DB и tunnel API.
+
+В `init_system_schema` создаются таблицы `config`, `OmniModules`, `OmniVPN`, `OmniDNS`, `OmniProxy`, `OmniMetrics`, `OmniSsl`, `OmniTunnel`. Модульный менеджер обеспечивает совместимость старой `OmniModules`, добавляя при необходимости поля `description`, `admin_entry`, `kind`.
+
+| Таблица | Назначение |
+|---|---|
+| `config` | Ключ-значение конфигурации |
+| `OmniModules` | ID, имя, версия, статус, пути, build log, enabled и метаданные UI/типа |
+| `OmniVPN` | Параметры VPN-конфигурации |
+| `OmniDNS` | DNS-записи/зоны в системной БД |
+| `OmniProxy` | Proxy host/path/enabled |
+| `OmniMetrics` | Временные метки и значения метрик |
+| `OmniSsl` | Сертификаты и ключевой материал по доменам |
+| `OmniTunnel` | Настройки/учётные данные туннелей |
+
+Путь БД задаётся переменными `OMNIRS_DB_*`, включая `OMNIRS_DB_DIR`, либо значением по умолчанию, реализованным в DB crate. Файлы `-wal` и `-shm` являются sidecar-файлами SQLite и не должны вручную редактироваться.
+
+## 7. Workspace crates
+
+### `core` — `omni-core`
+`core/src/lib.rs` экспортирует криптографический модуль; `core/src/crypto.rs` содержит общие криптографические операции, включая X25519/Curve25519. В новой версии `core/src/module.rs` отсутствует: старый C ABI контракт для `.so` удалён.
+
+### `cors` — `omni-cors`
+`cors/src/lib.rs` содержит общие CORS-хелперы. Применение middleware с `AppState` находится в `server/src/omni_mw.rs`.
+
+### `security` — `omni-security`
+`security/src/lib.rs` содержит IPS-подсистему, анализ событий/журналов, правила угроз и системные блокировки. Реальные пороги и команды следует проверять в исходнике; функциональность зависит от ОС и прав процесса.
+
+### `dns` — `omni-dns`
+`dns/src/lib.rs` реализует DNS-типы, запросы, записи и сетевые DNS-сервисы. DNS admin API находится в `server/src/api/handlers/dns_h.rs`.
+
+### `db` — `omni-db`
+SQLite, конфигурация, системные таблицы, SQL/DB API и tunnel API dispatch. Основные файлы: `lib.rs`, `dispatch.rs`.
+
+### `ikev2` — `omni-ikev2`
+`ikev2/src/lib.rs` содержит реализацию IKEv2/IPsec, конфигурацию, сетевой обмен и API dispatch.
+
+### `ssl` — `omni-ssl`
+`ssl/src/lib.rs` управляет TLS-сертификатами, rustls resolver, ACME challenges и циклом обновления сертификатов. Используется HTTPS/QUIC listener и API сертификатов.
+
+### `miraj` — `omni-miraj`
+`miraj/src/lib.rs` содержит QUIC/Hysteria-подобную подсистему, аутентификацию, потоки и запуск сервера.
+
+### `tunnel` — `omni-tunnel`
+- `lib.rs` — публичные типы и конфигурация;
+- `executor.rs` — исполнение задач;
+- `protocols.rs` — протокольные/network helpers;
+- `restrictions.rs` — ограничения разрешённых целей;
+- `server.rs` — серверный lifecycle и подключения;
+- `somark.rs` — socket mark;
+- `tls_reloader.rs` — TLS reload;
+- `transport.rs` — транспортные соединения.
+
+### `vpn` — `omni-vpn`
+- `lib.rs` — VPN state, запуск/остановка, клиенты, метрики и API;
+- `db.rs` — сохранение параметров и клиентов;
+- `iface.rs` — сетевой интерфейс;
+- `netlink.rs` — Generic Netlink/WireGuard;
+- `uapi.rs` — атрибуты и флаги WireGuard UAPI.
+
+VPN/IKEv2/firewall операции требуют соответствующей поддержки Linux и системных разрешений.
+
+## 8. Основной сервер `server`
+
+### `server/src/main.rs`
+Главная точка входа. Содержит конфигурацию и состояние приложения, HTTP routing, static serving, reverse proxy, health/metrics, TLS/HTTPS, QUIC/HTTP/3, ACME routing и запуск DNS, SSL, VPN, IKEv2, Miraj, tunnel и security. В этой версии объявляет `generated_modules` через `include!(concat!(env!("OUT_DIR"), "/generated_modules.rs"))`, вызывает `generated_modules::start(state.clone()).await` и регистрирует `/module-assets/{*name}`.
+
+### `server/src/api/mod.rs`
+Определяет `ApiCtx` и центральный dispatch. Размер тела upload — до 100 MiB, для прочих endpoint — до 10 MiB. Сначала выполняются dispatch-ветви DB/tunnel/VPN/certs/IKEv2/Miraj/modules, затем `generated_modules::dispatch(ctx.clone())`, далее обычные endpoint-обработчики.
+
+### `server/src/api/auth.rs`
+Вход/выход, проверка токена/сессии, whoami, управление сессиями и связанные административные endpoints.
+
+### `server/src/api/helpers.rs`
+Общие функции JSON/text/file responses, ошибки, query/form/body helpers и преобразование параметров.
+
+### `server/src/api/sess.rs`
+Сессионное и другое runtime-состояние в памяти процесса (не самостоятельное постоянное хранилище SQLite).
+
+### `server/src/api/handlers/`
+
+| Файл | Область |
+|---|---|
+| `mod.rs` | Экспорт обработчиков |
+| `cache.rs` | Кэш и статистика кэша |
+| `dns_h.rs` | DNS admin API |
+| `files.rs` | Файловые операции в разрешённом root |
+| `misc.rs` | Общие вспомогательные endpoints |
+| `proxy.rs` | Proxy/backends/virtual hosts и связанные настройки |
+| `settings.rs` | Runtime-настройки и параметры безопасности |
+| `system.rs` | Конфигурация, процессы, порты, disk, firewall и системные действия |
+| `ui.rs` | Настройки UI, вкладки, feature flags и уведомления |
+
+### `server/src/omni_mw.rs`
+Middleware доступа: журналирование запросов, request ID, security headers, метрики и CORS.
+
+### `server/src/static_assets.rs`
+Встраивает базовые HTML/JS/CSS через `include_str!`; изменение этих файлов требует пересборки, если файл обслуживается из embedded assets. UI-ресурсы устанавливаемых модулей, напротив, читаются с диска через `/module-assets/`.
+
+### `server/src/installer.rs`
+Отдельный Rust CLI-установщик с командами/меню установки, управления systemd, статуса и пароля. Это отдельный путь от `ritual.sh`; Bash-файл не изменён. Конкретные детали поведения определяются исходником.
+
+## 9. Админка и web terminal
+
+### `server/static/admin/`
+
+| Файл | Назначение |
+|---|---|
+| `admin.html` | HTML-оболочка админки |
+| `app.js` | Инициализация, общие UI helpers и навигация |
+| `dashboard.js` | Обзор/состояние |
+| `db.js` | DB UI |
+| `dns.js` | DNS UI |
+| `files.js` | Файловый менеджер |
+| `modules.js` | Системные/устанавливаемые модули, ZIP upload/update/delete и открытие admin entry; старые кнопки enable/disable и отдельного управления `.so` отсутствуют |
+| `proxy.js` | Reverse proxy UI |
+| `settings.js` | Общие настройки |
+| `ssl.js` | TLS/ACME UI |
+| `vpn.js` | VPN UI |
+| `style.css` | Стили |
+
+### `server/static/terminal/`
+`terminal.html` — оболочка; `app.js` — инициализация; `api.js` — API вызовы; `state.js` — клиентское состояние; `console.js` — консольный вывод; `views.js` — представления; `ui.js` — UI-события; `utils.js` — helpers; `hack.js` и `leak.js` — дополнительные визуальные/интерактивные части; `style.css` — стили. Это веб-терминал проекта, и его полномочия определяются серверным terminal API, а не самим фактом наличия терминального UI.
+
+## 10. Middleware и потоки запросов
+
+### Обычный запрос
+
+```text
+Client -> Axum Router (main.rs)
+       -> access_log / CORS / compression / timeout
+       -> API dispatcher, proxy, static assets, health/metrics или ACME logic
+```
+
+### API
+
+```text
+/api/* -> auth/session pipeline
+       -> ранние DB/tunnel/VPN/certs/IKEv2/Miraj/modules dispatchers
+       -> generated_modules::dispatch(ApiCtx)
+       -> стандартные API handlers
+```
+
+Пользовательский source-модуль не должен считать, что он перехватит endpoint, уже обработанный ранней ветвью dispatch. Пользовательский модуль также не является sandbox: это Rust-код, скомпилированный внутрь процесса сервера, с полномочиями процесса OmniRS.
+
+### Установка/обновление ZIP
+
+```text
+Admin UI -> POST /api/modules/upload/<id>
+         -> проверка ID + безопасная распаковка во временный каталог
+         -> чтение module.toml и проверка entry/admin_entry
+         -> перенос исходников в modules/installed/<id>
+         -> upsert OmniModules
+         -> фоновый cargo build --release -p omni-server
+         -> копирование нового target/release/OmniRS
+         -> замена исполняемого файла и systemctl restart omnirs.service
+```
+
+Сборка запускается через `systemd-run --no-block`, а если это не удаётся — отдельным фоновым процессом. Состояния пишутся в `modules/state/<id>.status`, журнал — в `modules/state/<id>.log`.
+
+### Важные ограничения lifecycle
+
+- Запуск фоновой сборки зависит от наличия Cargo, исходников workspace, прав доступа и systemd/возможности запуска фонового процесса.
+- Build script собирает `cargo build --release -p omni-server` и ожидает `target/release/OmniRS`.
+- При неудачной сборке действующий бинарник не копируется поверх, но новые исходники уже могут находиться в `modules/installed/<id>`.
+- При обновлении старый каталог перемещается в staging backup; текущий build script удаляет backup после успешной сборки. При ошибке сборки автоматический rollback исходников не реализован.
+- Удаление исходников требует пересборки, иначе запущенный/сохранённый бинарник может содержать код предыдущей версии до успешной замены.
+- В коде нет изоляции source-модулей от процесса сервера.
+
+## 11. Конфигурация и переменные окружения
+
+Основная runtime-конфигурация описана в `server/src/main.rs`; DB параметры — в `db/src/lib.rs` и соответствующих DB helpers. В разных компонентах используются `OMNIRS_*` переменные. Для полного списка нужно сверять текущие обращения к `std::env::var`/`env::var` в исходниках: этот документ перечисляет архитектуру, а не исчерпывающий каталог каждого environment key.
+
+## 12. Установщики
+
+- `ritual.sh` — исходный Bash-установщик в корне; в этом изменении он не модифицировался.
+- `server/src/installer.rs` — CLI-установщик, встроенный в бинарник. Он не является менеджером source-модулей; за ZIP-модули отвечает `server/src/modules.rs`.
+- Фоновая пересборка source-модулей — отдельный процесс, который создаётся `modules.rs` и использует `systemd-run` или fallback `sh`.
+
+## 13. Внешние зависимости по назначению
+
+Точные зависимости указаны в корневом `Cargo.toml` и в `*/Cargo.toml`. Основные группы:
+
+| Область | Примеры |
+|---|---|
+| Async runtime | Tokio, tokio-util, tokio-stream, futures-util |
+| HTTP | Axum, Hyper, Tower, tower-http, axum-server |
+| HTTP/3 / QUIC | Quinn, h3, h3-quinn, h3-axum, WebTransport crates |
+| TLS / ACME | rustls, tokio-rustls, rcgen, x509-parser, p256/p384/p521, rsa |
+| База данных | rusqlite (bundled), bb8, moka |
+| ZIP и манифесты | zip, toml, serde, serde_json, serde_yaml |
+| Crypto / hashes | x25519-dalek, aes-gcm, sha2, sha1, hmac, blake2, base64 |
+| Networking/system | socket2, ipnet, hickory crates, libc, nix |
+
+Старая зависимость `libloading` и старый C ABI module contract в обновлённом проекте отсутствуют.
+
+## 14. Где менять функциональность
+
+| Задача | Основное место |
+|---|---|
+| Основной runtime, listeners, proxy | `server/src/main.rs` |
+| Генерация реестра встроенных source-модулей | `server/build.rs` |
+| Установка, обновление, список, удаление ZIP | `server/src/modules.rs` |
+| Контракт устанавливаемого модуля | `MODULES.md`, `examples/module-template/` |
+| API dispatch и ApiCtx | `server/src/api/mod.rs` |
+| Авторизация | `server/src/api/auth.rs` |
+| Схема и DB API | `db/src/lib.rs`, `db/src/dispatch.rs` |
+| DNS | `dns/src/lib.rs`, `server/src/api/handlers/dns_h.rs` |
+| TLS/ACME | `ssl/src/lib.rs` |
+| VPN | `vpn/src/` |
+| IKEv2 | `ikev2/src/lib.rs` |
+| QUIC/Miraj | `miraj/src/lib.rs` |
+| Туннели | `tunnel/src/` |
+| IPS/security | `security/src/lib.rs` |
+| CORS | `cors/src/lib.rs`, `server/src/omni_mw.rs` |
+| Админка | `server/static/admin/` |
+| Web terminal | `server/static/terminal/`, `server/src/api/mod.rs` |
+| Rust CLI installer | `server/src/installer.rs` |
+| Bash installer | `ritual.sh` |
+
+## 15. Проверка и сборка
+
+Команды из корня workspace:
 
 ```bash
-cargo check            # ~0 ошибок
-cargo build            # бинарник: target/debug/OmniRS ([[bin]] name = "OmniRS")
-cargo build --release  # lto = "thin", codegen-units = 1
-./ritual.sh            # установка на сервер: systemd unit omnirs.service, swap 2G, seed БД, alias 'ritual'
+cargo check --workspace
+cargo build -p omni-server
+cargo build -p omni-server --release
 ```
 
-- Бинарник запускается из `/root/OmniRS/OmniRS`, `OMNIRS_DB_DIR=/root/OmniRS/db` (см. unit в ritual.sh).
-- Подкоманды: `OmniRS config test` — seed БД (admin_token, address).
+Бинарный target называется `OmniRS`. Для проверки устанавливаемых модулей необходимо, чтобы их исходники уже лежали в `modules/installed/<id>/` до запуска Cargo, поскольку build.rs обнаруживает их во время сборки.
 
-### Слушающие порты (типично)
-| Порт | Сервис |
-|---|---|
-| 80 | HTTP (ACME HTTP-01, редирект) |
-| 443 | HTTPS (TLS) + HTTP/3 (QUIC) + multiplexed miraj |
-| 53 (udp/tcp) | DNS authoritative/recursive |
-| 853 | DoT, 784/853? DoQ (QUIC), DoH/DoH3 поверх HTTPS |
-| 500/4500 | IKEv2/IPsec |
-| 880 | WireGuard (порт по умолчанию) |
-| 1000 | Unified listener: MySQL + PostgreSQL + omni-shell |
-| 8080/8443? | внутренние (туннели/админка) |
+## 16. Итоговая модель
 
-### Env-переменные (`OMNIRS_*`)
-`ADDR, ADMIN_TOKEN, DB_DIR, DB_ENABLED, DB_ALLOW_DDL, DB_ALLOW_WRITE, DNS_ENABLED, DNS_CONFIG, ROOT, ADMIN_ROOT, PROXY_PREFIX, BACKENDS, ACME_MODE, ACME_IP, ACME_DOMAINS, FASTCGI_PASS, CORS_ALLOWED_ORIGINS, ACCESS_LOG_PATH, SLOW_LOG_PATH, AUDIT_LOG, AUDIT_LOG_MAX_MB, ADMIN_ALLOWED_IPS, METRICS_ALLOWED_IPS, TRUST_PROXY, VPN_ENABLED, TUNNEL_ENABLED, TUNNEL_PATH_PREFIX, TUNNEL_ALLOW_TARGETS, IPS, IPS_LOG_PACKETS, SSH_WHITELIST, AUTO_OPEN_PORTS, STICKY_SESSIONS, H3_PORT`.
-
-Приоритет конфига: **DB (config-таблица) > env > дефолты**.
-
----
-
-## 6. Что было сделано при рефакторинге (заметки)
-
-1. **Цикл `db ↔ vpn` разорван**: `vpn::crypto` (чистые функции) → `core`; `vpn::db::{client_table_name, create_client_table}` (SQL-схема) → `db`. В `vpn::db` остался ре-экспорт + функции, требующие VPN-типов (`row_to_client`, `drop_client_table`, `get_interface`).
-2. **Отвязка dispatch-функций от `AppState`**: вместо `Arc<AppState>` domain-крейты принимают только нужные поля (db handle, 5 ikev2-полей, acme_ip/root/ssl). `vpn::dispatch` и `miraj::dispatch_api` state не принимают.
-3. **`access_log` + `cors_mw` перенесены в `server::omni_mw`** — они используют `SharedState`/`resolve_client_ip` (server-local). Модуль назван `omni_mw`, чтобы не конфликтовать с `axum::middleware`.
-4. **`map.rs` не переносился** — мёртвый файл (0 pub-items, ни на что не ссылается, только комментарии).
-5. **`crate::tunnel::` self-ссылки** в tunnel.rs заменены на `crate::` (tunnel теперь и есть крейт).
-6. **Виртуальный манифест** не поддерживает `[target.'cfg(...)'.workspace.dependencies]` — `tokio-fd` добавлен как обычная target-зависимость в tunnel/ikev2/server.
-7. **Линкер**: оригинал `clang`+`mold`; в `.cargo/config.toml` оставлен `cc` (переносимо) — верните при наличии clang/mold.
-8. В lib-крейтах зависимости намеренно избыточны (только warnings `unused dependency`) — можно подчистить.
-
----
-
-## 7. Обновление v2 (по запросу)
-
-### Независимость модулей
-- Domain-крейты (`dns, security, logger, cors, tunnel, ikev2, ssl, miraj, vpn`) больше не зависят друг от друга — только от инфраструктурных `core` + `db`.
-- `ssl` больше не зависит от `dns`: `normalize_dns_name` / `extract_sans` заинлайнены в ssl-крейт.
-- `vpn` не ре-экспортирует чужой код: `pub use omni_db::{...}` удалён, внутренние вызовы идут через `omni_db::`, в `vpn::mod db` — только `use` (не `pub use`). Каждый крейт содержит только свой код.
-- Настоящих блочных комментариев `/* */` в проекте нет (все вхождения `/*` — внутри `//`-строк, напр. `/api/*`).
-
-### Дробление больших файлов
-- `vpn/src/`: lib.rs + `uapi.rs`, `netlink.rs`, `iface.rs`, `db.rs` (inline-модули вынесены в файлы).
-- `tunnel/src/`: lib.rs + `somark.rs`, `executor.rs`, `protocols.rs`, `restrictions.rs`, `tls_reloader.rs`, `transport.rs`, `server.rs`.
-- `db/src/`: lib.rs + `dispatch.rs` (dispatch_api/dispatch_tunnel_api + client_table-хелперы, ре-экспорт через `pub use dispatch::*`).
-- `server/src/`: main.rs + `api.rs` + `omni_mw.rs` + `static_assets.rs` (include_str!-константы) + `modules.rs`.
-- `api.rs` оставлен единым (сильно связанные приватные хелперы; дальнейший сплит требует их `pub(crate)`).
-
-### Управление модулями в админке (переработано)
-- Backend: `server/src/modules.rs` — единый реестр системных и устанавливаемых Rust source-модулей в `OmniModules`.
-- `server/build.rs` обнаруживает `modules/installed/<id>/module.toml`, подключает указанный `entry` как модуль основного server crate и генерирует `generated_modules.rs`.
-- Каждый source-модуль реализует `start(SharedState)` и `dispatch(ApiCtx)`. `start` запускается при старте сервера; `dispatch` выполняется внутри защищённого `/api/*` pipeline после проверки административной авторизации.
-- `POST /api/modules/upload/<id>` принимает ZIP с `module.toml`, `src/*.rs` и необязательным `admin/`. Повторная загрузка того же ID обновляет пакет. После загрузки запускается отдельная фоновая сборка основного `OmniRS`, замена бинарника и перезапуск `omnirs.service`.
-- Административный интерфейс модуля подключается через `admin_entry` и экспорт `mount(container)`; ресурсы раздаются через `/module-assets/<id>/...`.
-- `native_modules.rs`, C-ABI `.so` loader, `libloading`, старые переключатели и кнопка логов удалены. Формат пакета и контракт описаны в `MODULES.md`.
+- **Cargo workspace** компилирует встроенные crates и основной сервер.
+- **`server/build.rs`** включает source-модули из `modules/installed/` в compile-time Rust registry.
+- **`server/src/modules.rs`** управляет ZIP, манифестами, БД, обновлением, удалением и фоновым rebuild.
+- **`server/src/main.rs`** запускает установленные модули и отдаёт их admin assets.
+- **`server/src/api/mod.rs`** направляет API-контекст в пользовательские `dispatch()` функции.
+- **`OmniModules`** хранит метаданные/состояние, но сама по себе не подключает Rust-код.
+- **`.so` / `libloading` / `native_modules.rs`** в этой версии не используются.
+- **`ritual.sh`** остаётся отдельным Bash-установщиком.
