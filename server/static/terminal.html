@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#ffffff">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="format-detection" content="telephone=no">
+<meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex">
+<title>Omni Rusr Server Foundation</title>
+<link rel="stylesheet" href="/static/terminal/style.css">
+</head>
+<body oncontextmenu="return false" ondragstart="return false" onselectstart="return false" oncopy="return false" oncut="return false" onpaste="return false">
+<div class="header">
+  <div class="ascii-border" id="ascii-border"></div>
+  <div class="web" id="web">🕸️</div>
+  <div id="banner"></div>
+  <div class="subtitle">Omni Rust Server · <span id="clock">--:--:--</span></div>
+</div>
+<div id="terminal-container"><div id="terminal"></div></div>
+<nav class="nav-dock" id="navDock" aria-label="Навигация по карте сервера">
+  <button class="nav-btn" data-tab="map"><div class="nav-icon">🗺️</div><div class="nav-label">Карта</div></button>
+  <button class="nav-btn" data-tab="http"><div class="nav-icon">🌐</div><div class="nav-label">HTTP</div></button>
+  <button class="nav-btn" data-tab="dns"><div class="nav-icon">🌍</div><div class="nav-label">DNS</div></button>
+  <button class="nav-btn" data-tab="db"><div class="nav-icon">🗄️</div><div class="nav-label">БД</div></button>
+  <button class="nav-btn" data-tab="vpn"><div class="nav-icon">🛡️</div><div class="nav-label">VPN</div></button>
+  <button class="nav-btn" data-tab="proxy"><div class="nav-icon">🔀</div><div class="nav-label">Proxy</div></button>
+  <button class="nav-btn" data-tab="security"><div class="nav-icon">🔒</div><div class="nav-label">Защита</div></button>
+  <button class="nav-btn" data-tab="console"><div class="nav-icon">⚡</div><div class="nav-label">Консоль</div></button>
+</nav>
+<div class="input-line" id="inputLine"><span id="prompt">root@omni:~#</span><input id="input" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="send"></div>
+<div class="money-rain" id="money-rain"></div>
+<script type="module" src="/static/terminal/app.js"></script>
+</body>
+</html>

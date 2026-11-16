@@ -1,0 +1,69 @@
+[package]
+name = "omni-cors"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[lib]
+name = "omni_cors"
+path = "src/lib.rs"
+
+[dependencies]
+
+
+# ── full external dep set (generous; unused are warnings only) ──
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+log = { workspace = true }
+tracing = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+time = { workspace = true }
+base64 = { workspace = true }
+uuid = { workspace = true }
+parking_lot = { workspace = true }
+arc-swap = { workspace = true }
+either = { workspace = true }
+scopeguard = { workspace = true }
+pin-project = { workspace = true }
+crc32fast = { workspace = true }
+regex = { workspace = true }
+flate2 = { workspace = true }
+url = { workspace = true }
+bytes = { workspace = true }
+subtle = { workspace = true }
+rand = { workspace = true }
+tokio = { workspace = true }
+tokio-util = { workspace = true }
+tokio-stream = { workspace = true }
+futures-util = { workspace = true }
+axum = { workspace = true }
+tower = { workspace = true }
+tower-http = { workspace = true }
+hyper = { workspace = true }
+hyper-util = { workspace = true }
+http-body-util = { workspace = true }
+http = { workspace = true }
+httparse = { workspace = true }
+quinn = { workspace = true }
+h3 = { workspace = true }
+h3-quinn = { workspace = true }
+quinn-proto = { workspace = true }
+rustls = { workspace = true }
+tokio-rustls = { workspace = true }
+rustls-pki-types = { workspace = true }
+rustls-native-certs = { workspace = true }
+der = { workspace = true }
+num-bigint = { workspace = true }
+num-traits = { workspace = true }
+sha2 = { workspace = true }
+sha1 = { workspace = true }
+hmac = { workspace = true }
+moka = { workspace = true }
+ipnet = { workspace = true }
+socket2 = { workspace = true }
+hickory-proto = { workspace = true }
+libc = { workspace = true }
+image = { workspace = true }
+
+[target.'cfg(unix)'.dependencies]

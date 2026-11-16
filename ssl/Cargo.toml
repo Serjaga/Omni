@@ -1,0 +1,110 @@
+[package]
+name = "omni-ssl"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[lib]
+name = "omni_ssl"
+path = "src/lib.rs"
+
+[dependencies]
+omni-db = { workspace = true }
+
+# ── full external dep set (generous; unused are warnings only) ──
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+log = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml = { workspace = true }
+serde_regex = { workspace = true }
+toml = { workspace = true }
+chrono = { workspace = true }
+time = { workspace = true }
+hex = { workspace = true }
+base64 = { workspace = true }
+uuid = { workspace = true }
+parking_lot = { workspace = true }
+arc-swap = { workspace = true }
+async-channel = { workspace = true }
+either = { workspace = true }
+ahash = { workspace = true }
+derive_more = { workspace = true }
+scopeguard = { workspace = true }
+pin-project = { workspace = true }
+crc32fast = { workspace = true }
+blake2 = { workspace = true }
+regex = { workspace = true }
+flate2 = { workspace = true }
+notify = { workspace = true }
+url = { workspace = true }
+urlencoding = { workspace = true }
+bytes = { workspace = true }
+subtle = { workspace = true }
+rand = { workspace = true }
+tokio = { workspace = true }
+tokio-util = { workspace = true }
+tokio-stream = { workspace = true }
+futures-util = { workspace = true }
+axum = { workspace = true }
+axum-server = { workspace = true }
+tower = { workspace = true }
+tower-http = { workspace = true }
+hyper = { workspace = true }
+hyper-util = { workspace = true }
+http-body-util = { workspace = true }
+http = { workspace = true }
+mime_guess = { workspace = true }
+httparse = { workspace = true }
+fastwebsockets = { workspace = true }
+reqwest = { workspace = true }
+quinn = { workspace = true }
+h3 = { workspace = true }
+h3-quinn = { workspace = true }
+h3-axum = { workspace = true }
+quinn-proto = { workspace = true }
+web-transport-quinn = { workspace = true }
+web-transport-proto = { workspace = true }
+rustls = { workspace = true }
+tokio-rustls = { workspace = true }
+rustls-pemfile = { workspace = true }
+rustls-pki-types = { workspace = true }
+rustls-native-certs = { workspace = true }
+p256 = { workspace = true }
+p384 = { workspace = true }
+p521 = { workspace = true }
+rsa = { workspace = true }
+x509-cert = { workspace = true }
+der = { workspace = true }
+x509-parser = { workspace = true }
+rcgen = { workspace = true }
+aes-gcm = { workspace = true }
+x25519-dalek = { workspace = true }
+num-bigint = { workspace = true }
+num-traits = { workspace = true }
+sha2 = { workspace = true }
+sha1 = { workspace = true }
+hmac = { workspace = true }
+rusqlite = { workspace = true }
+bb8 = { workspace = true }
+moka = { workspace = true }
+fastcgi-client = { workspace = true }
+fast-socks5 = { workspace = true }
+ppp = { workspace = true }
+ipnet = { workspace = true }
+socket2 = { workspace = true }
+hickory-resolver = { workspace = true }
+hickory-proto = { workspace = true }
+libc = { workspace = true }
+nix = { workspace = true }
+jsonwebtoken = { workspace = true }
+qrcode = { workspace = true }
+image = { workspace = true }
+netlink-packet-route = "0.18"
+netlink-sys = "0.8"
+
+[target.'cfg(unix)'.dependencies]
+tokio-fd = "0.3"

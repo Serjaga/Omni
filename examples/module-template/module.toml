@@ -1,0 +1,7 @@
+id = "example_module"
+name = "Example module"
+version = "1.0.0"
+description = "Шаблон полноценного Rust-модуля OmniRS"
+kind = "source"
+entry = "src/installer.rs"
+admin_entry = "admin/index.js"
