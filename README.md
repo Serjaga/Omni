@@ -111,23 +111,159 @@ OmniRS aims to combine the flexibility of traditional web servers with a memory-
 ## Workspace layout
 
 ```text
-OmniRS/
-├── Cargo.toml              # Cargo workspace and shared dependencies
-├── core/                   # Core utilities and cryptography
-├── cors/                   # CORS component
-├── db/                     # Database component and bundled database files
-├── dns/                    # DNS component
-├── ikev2/                  # IKEv2 implementation
-├── miraj/                  # Miraj component
-├── security/               # Security component
-├── server/                 # Main server binary, API, installer and admin assets
-│   └── static/admin/       # Administration UI JavaScript and CSS
-├── ssl/                    # TLS/SSL management
-├── tunnel/                 # Tunnel component
-├── vpn/                    # VPN component
-├── examples/               # Example module and module template
-├── public/                 # Public web content
-└── admin-data/              # Administration data directory
+OmniRS/                                      # Omni Rust Server project root
+├── .cargo/                                  # Cargo build configuration
+│   └── config.toml                           # Compiler and target platform settings
+├── Cargo.toml                               # Main Cargo workspace manifest and shared dependencies
+├── Cargo.lock                               # Locked Rust dependency versions
+├── MAP.md                                   # Project architecture map and component relationships
+├── MODULES.md                               # Module system documentation
+├── ritual.sh                                # Installation, build, startup, and maintenance script
+│
+├── core/                                    # Core utilities and shared functionality
+│   ├── Cargo.toml                           # Core component dependencies and configuration
+│   └── src/
+│       ├── lib.rs                           # Core library entry point and public interface
+│       └── crypto.rs                        # Cryptographic functions and utilities
+│
+├── cors/                                    # Cross-Origin Resource Sharing (CORS) component
+│   ├── Cargo.toml                           # CORS component dependencies
+│   └── src/
+│       └── lib.rs                           # CORS policy and request handling
+│
+├── db/                                      # Database access and storage
+│   ├── Cargo.toml                           # Database component dependencies
+│   ├── OmniDB                                 # Main SQLite database file
+│   ├── OmniDB-shm                             # SQLite shared-memory file for OmniDB
+│   ├── OmniDB-wal                             # SQLite write-ahead log for OmniDB
+│   ├── OmniVPN                                # VPN database file
+│   ├── OmniVPN-shm                            # SQLite shared-memory file for OmniVPN
+│   ├── OmniVPN-wal                            # SQLite write-ahead log for OmniVPN
+│   └── src/
+│       ├── lib.rs                           # Main database library interface
+│       └── dispatch.rs                      # Database operation dispatching
+│
+├── dns/                                     # DNS component
+│   ├── Cargo.toml                           # DNS component dependencies
+│   └── src/
+│       └── lib.rs                           # DNS functionality and public interface
+│
+├── ikev2/                                   # IKEv2/IPsec VPN server
+│   ├── Cargo.toml                           # IKEv2 component dependencies
+│   └── src/
+│       └── lib.rs                           # Main IKEv2 protocol implementation
+│
+├── miraj/                                   # Miraj component
+│   ├── Cargo.toml                           # Miraj component dependencies
+│   └── src/
+│       └── lib.rs                           # Miraj functionality and public interface
+│
+├── security/                                # Security component
+│   ├── Cargo.toml                           # Security component dependencies
+│   └── src/
+│       └── lib.rs                           # Security functionality and public interface
+│
+├── ssl/                                     # TLS/SSL and certificate management
+│   ├── Cargo.toml                           # SSL component dependencies
+│   └── src/
+│       └── lib.rs                           # TLS/SSL management and certificate handling
+│
+├── tunnel/                                  # Tunneling and transport connections
+│   ├── Cargo.toml                           # Tunnel component dependencies
+│   └── src/
+│       ├── lib.rs                           # Tunnel library entry point
+│       ├── executor.rs                      # Tunnel operation execution
+│       ├── protocols.rs                     # Supported transport protocols
+│       ├── restrictions.rs                  # Access restrictions and rules
+│       ├── server.rs                        # Tunnel server implementation
+│       ├── somark.rs                        # SOMARK-related functionality
+│       ├── tls_reloader.rs                  # TLS configuration reloading
+│       └── transport.rs                     # Tunnel transport layer
+│
+├── vpn/                                     # VPN management and WireGuard integration
+│   ├── Cargo.toml                           # VPN component dependencies
+│   └── src/
+│       ├── lib.rs                           # Main VPN interface and functionality
+│       ├── db.rs                            # VPN database operations
+│       ├── iface.rs                         # VPN network interface management
+│       ├── netlink.rs                       # Linux Netlink communication
+│       └── uapi.rs                          # WireGuard userspace API integration
+│
+├── server/                                  # Main OmniRS server application
+│   ├── Cargo.toml                           # Server dependencies and binary configuration
+│   ├── build.rs                             # Build-time resource preparation
+│   │
+│   ├── src/
+│   │   ├── main.rs                          # Application entry point and server startup
+│   │   ├── installer.rs                     # Installation and configuration logic
+│   │   ├── modules.rs                       # Module loading and management
+│   │   ├── omni_mw.rs                       # Server middleware
+│   │   ├── static_assets.rs                 # Static asset handling
+│   │   │
+│   │   └── api/                             # Administration API
+│   │       ├── mod.rs                       # API organization and registration
+│   │       ├── auth.rs                      # Authentication and access control
+│   │       ├── helpers.rs                   # Shared API helper functions
+│   │       ├── sess.rs                      # Session management
+│   │       │
+│   │       └── handlers/                    # API request handlers
+│   │           ├── mod.rs                   # Handler module registration
+│   │           ├── cache.rs                 # Cache management operations
+│   │           ├── dns_h.rs                 # DNS API handlers
+│   │           ├── files.rs                 # File management API
+│   │           ├── misc.rs                  # Miscellaneous API operations
+│   │           ├── proxy.rs                 # Reverse proxy configuration and management
+│   │           ├── settings.rs              # Server settings management
+│   │           ├── system.rs                # System information and operations
+│   │           └── ui.rs                    # Administration UI handlers
+│   │
+│   └── static/                              # Static web interface resources
+│       ├── admin.html                       # Administration panel HTML
+│       ├── admin/                           # Administration panel JavaScript and CSS
+│       │   ├── app.js                       # Main administration interface logic
+│       │   ├── dashboard.js                 # Dashboard and status monitoring
+│       │   ├── db.js                        # Database management interface
+│       │   ├── dns.js                       # DNS management interface
+│       │   ├── files.js                     # File management interface
+│       │   ├── modules.js                   # Module management interface
+│       │   ├── proxy.js                     # Reverse proxy configuration interface
+│       │   ├── settings.js                  # General server settings interface
+│       │   ├── ssl.js                       # TLS/SSL and certificate management interface
+│       │   ├── style.css                    # Administration panel styles
+│       │   └── vpn.js                       # VPN management interface
+│       │
+│       ├── terminal.html                    # Web terminal HTML
+│       └── terminal/                        # Web terminal components
+│           ├── api.js                       # Terminal API communication
+│           ├── app.js                       # Terminal initialization
+│           ├── console.js                   # Console interface
+│           ├── hack.js                      # Additional terminal interface effects
+│           ├── leak.js                      # Additional interface logic
+│           ├── state.js                     # Terminal state management
+│           ├── style.css                    # Terminal styles
+│           ├── ui.js                        # Terminal UI components
+│           ├── utils.js                     # Shared terminal utilities
+│           └── views.js                     # Terminal views and rendering
+│
+├── examples/                                # Example modules and templates
+│   ├── example_module.zip                   # Example module archive
+│   └── module-template/                     # Template for creating new modules
+│       ├── module.toml                      # Module manifest and metadata
+│       ├── admin/                           # Module administration assets
+│       │   └── index.js                     # Module administration interface
+│       └── src/
+│           └── installer.rs                 # Rust module installer implementation
+│
+├── modules/                                 # Module lifecycle directories
+│   ├── installed/                           # Installed modules
+│   │   └── .keep                            # Keeps the directory in version control
+│   ├── staging/                             # Temporary module installation files
+│   │   └── .keep                            # Keeps the directory in version control
+│   └── state/                               # Module state and metadata
+│       └── .keep                            # Keeps the directory in version control
+│
+├── public/                                  # Public website files and web content
+└── admin-data/                              # Administration data and runtime files
 ```
 
 ## Requirements
