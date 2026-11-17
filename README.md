@@ -111,7 +111,9 @@ OmniRS aims to combine the flexibility of traditional web servers with a memory-
 ## Workspace layout
 
 ```text
-OmniRS/                                      # Omni Rust Server project root
+
+OmniRS/       # Omni Rust Server Foundation project root
+├── OmniRS                                   # Compiled server binary, approx. 20 MB
 ├── .cargo/                                  # Cargo build configuration
 │   └── config.toml                           # Compiler and target platform settings
 ├── Cargo.toml                               # Main Cargo workspace manifest and shared dependencies
@@ -264,6 +266,7 @@ OmniRS/                                      # Omni Rust Server project root
 │
 ├── public/                                  # Public website files and web content
 └── admin-data/                              # Administration data and runtime files
+
 ```
 
 ## Requirements
