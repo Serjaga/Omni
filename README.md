@@ -4,6 +4,19 @@
 
 > **Project status:** This README describes the source tree in the supplied archive. It does not imply that every protocol or roadmap item is production-ready. Check the current implementation and test results before exposing services to the public Internet.
 
+## HTTPS, TLS, HTTP/3 and QUIC
+
+OmniRS supports modern web protocols and secure connections:
+
+- **HTTPS** — secure access to websites and APIs.
+- **TLS** — encrypted connections using native Rust TLS libraries.
+- **HTTP/3** — support for the modern HTTP protocol over QUIC.
+- **QUIC** — a UDP-based transport protocol providing encryption and reduced connection latency.
+- **HTTPS over IP addresses** — the ability to establish secure connections directly through a public IP address without requiring a domain name, provided a suitable IP address certificate is available.
+- **Let's Encrypt** — automated certificate issuance and management for supported scenarios, including IP address certificates.
+
+OmniRS is designed as a unified server platform combining a web server, TLS, HTTP/3, QUIC, reverse proxying, and VPN capabilities.
+
 ## Features present in the source tree
 
 - **HTTP server and administration API** — Axum-based server, static administration assets, API routes, health and metrics endpoints.
