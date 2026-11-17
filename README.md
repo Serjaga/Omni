@@ -30,6 +30,84 @@ OmniRS is designed as a unified server platform combining a web server, TLS, HTT
 - **Miraj and tunnels** — separate `miraj` and `tunnel` crates.
 - **Module examples** — an example module and module template are included.
 
+## PHP, .htaccess and Reverse Proxy Support
+
+OmniRS is designed to support common web hosting features, legacy PHP applications, and flexible proxy configurations.
+
+- **PHP Support** — integration with PHP applications through PHP-FPM or FastCGI, enabling websites built with PHP, including WordPress and other popular CMS platforms.
+- **.htaccess Support** — compatibility with Apache-style `.htaccess` configuration for directory-level URL rewriting, redirects, access rules, and other supported directives.
+- **Reverse Proxy** — forwarding HTTP and HTTPS requests to backend applications and services.
+- **Path-Based Proxying** — routing requests by URL prefix, such as `/api`, to different backend servers.
+- **Virtual Hosts** — hosting multiple websites and applications on a single server.
+- **Backend Load Balancing** — distributing requests across multiple backend servers.
+- **URL Rewriting and Redirects** — configuring URL transformations and HTTP redirects.
+- **Flexible Backend Integration** — connecting applications written in PHP, Rust, Node.js, Python, and other languages through supported protocols.
+
+OmniRS aims to provide a unified alternative to traditional web server stacks by combining web serving, reverse proxying, TLS, HTTP/3, and QUIC in a single Rust-based platform.
+
+**Note:** PHP execution requires a PHP runtime, such as PHP-FPM. `.htaccess` compatibility requires an implementation or translation layer for the supported directives; Apache's complete `.htaccess` functionality should not be assumed unless explicitly implemented.
+
+## Advantages Over Nginx, Apache and OpenLiteSpeed
+
+OmniRS is designed as a unified, Rust-based server platform that combines web serving, reverse proxying, modern network protocols, VPN functionality, and extensible modules in one ecosystem.
+
+### Key Advantages
+
+- **Unified Architecture** — web server, reverse proxy, TLS, DNS, VPN, and other server components within one platform.
+- **Memory Safety** — written in Rust, reducing the risk of memory-related vulnerabilities common in unsafe code.
+- **High Performance** — built on asynchronous Rust and Tokio for concurrent network workloads with minimal runtime overhead.
+- **Modern Protocols** — designed to support HTTP/1.1, HTTP/2, HTTP/3, QUIC, TLS, and WebSockets.
+- **IP-Based HTTPS** — support for secure connections through IP addresses when a suitable IP certificate is available.
+- **Integrated VPN** — WireGuard and IKEv2 functionality within the same server ecosystem.
+- **Flexible Reverse Proxy** — route requests to different backends by URL, integrate applications, and distribute traffic.
+- **Modular Architecture** — extend functionality through independent components and modules.
+- **Automation and Administration** — centralized configuration and a web-based administration interface.
+- **Reduced Stack Complexity** — the potential to replace several separately managed services with one integrated platform.
+- **Extensible Runtime** — planned WebAssembly-based modules for sandboxed application extensions.
+
+### Comparison With Traditional Web Servers
+
+| Feature | OmniRS | Nginx | Apache HTTP Server | OpenLiteSpeed |
+|---|---|---|---|---|
+| Implementation language | Rust | C | C | C/C++ |
+| Memory-safety-oriented design | Yes | No | No | No |
+| HTTP/1.1 and HTTP/2 | Designed to support | Yes | Yes | Yes |
+| HTTP/3 and QUIC | Included in project scope | Supported in appropriate builds | Depends on version and configuration | Supported |
+| HTTPS/TLS | Integrated TLS management | Yes | Yes | Yes |
+| HTTPS using IP certificates | Supported when certificate flow permits | Certificate/configuration dependent | Certificate/configuration dependent | Certificate/configuration dependent |
+| Reverse proxy | Integrated | Yes | Yes, with modules | Yes |
+| PHP applications | Through PHP-FPM/FastCGI integration | Through PHP-FPM/FastCGI | Native FastCGI and other integrations | Integrated PHP support |
+| `.htaccess` | Supported directives depend on implementation | No native `.htaccess` | Yes | Supported |
+| VPN integration | Integrated project component | External service required | External service required | External service required |
+| DNS component | Integrated project component | External service required | External service required | External service required |
+| Web administration | Integrated project UI | Commonly external tools | Commonly external tools | WebAdmin |
+| Modular extensions | Project modules; WebAssembly planned | Modules | Modules | Modules |
+
+*This table describes the architectural goals and general characteristics of the products. Features marked as supported by OmniRS must be verified against the implementation and enabled build; the table does not imply that every planned feature is production-ready.*
+
+## Database Connectivity and Protocol Support
+
+OmniRS is intended to integrate with applications using popular database systems and their native client protocols.
+
+- **PostgreSQL** — connectivity to PostgreSQL servers using the PostgreSQL wire protocol.
+- **MySQL / MySQLi** — support for PHP applications using the MySQL protocol through MySQL-compatible database servers. MySQLi is a PHP database extension, not a separate network protocol.
+- **SQLite** — embedded database support for applications that use local SQLite database files.
+- **Database Integration** — connect backend applications to databases without requiring the web server itself to implement every database engine.
+- **Multiple Database Backends** — allow different applications and modules to use different database systems.
+
+### Database Compatibility
+
+| Database | Protocol / Interface | Typical Use |
+|---|---|---|
+| PostgreSQL | PostgreSQL wire protocol | Relational databases and enterprise applications |
+| MySQL | MySQL client/server protocol | Websites, CMS platforms, and web applications |
+| MySQLi | PHP extension using the MySQL protocol | PHP applications and CMS integrations |
+| SQLite | SQLite library/API and database files | Embedded applications and lightweight storage |
+
+**Important:** Database connectivity can be provided by application runtimes, database drivers, and OmniRS modules. Native PostgreSQL protocol handling or direct MySQLi/SQLite integration inside the core server should only be claimed when implemented and tested.
+
+OmniRS aims to combine the flexibility of traditional web servers with a memory-safe Rust architecture and an integrated server ecosystem, reducing operational complexity while supporting modern web applications and network services.
+
 ## Workspace layout
 
 ```text
